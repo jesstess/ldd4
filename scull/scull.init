@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sample init script for the a driver module <rubini@linux.it>
+# Sample init script for the scull driver module.
 
 DEVICE="scull"
 SECTION="misc"
@@ -19,9 +19,9 @@ function device_specific_pre_unload () {
     true; # fill at will
 }
 
-# Everything below this line should work unchanged for any char device.
-# Obviously, however, no options on the command line: either in
-# /etc/${DEVICE}.conf or /etc/modules.conf (if modprobe is used)
+# Everything below this line should work unchanged for any char device. Options
+# cannot be specified via the command line. Instead, define them in in
+# /etc/${DEVICE}.conf or (if modprobe is used) /etc/modules.conf.
 
 # Optional configuration file: format is
 #    owner  <ownername>
@@ -30,31 +30,30 @@ function device_specific_pre_unload () {
 #    options <insmod options>
 CFG=/etc/${DEVICE}.conf
 
-# kernel version, used to look for modules
+# The kernel version, used to look for modules.
 KERNEL=`uname -r`
 
-#FIXME: it looks like there is no misc section. Where should it be?
 MODDIR="/lib/modules/${KERNEL}/kernel/drivers/${SECTION}"
-if [ ! -d $MODDIR ]; then MODDIR="/lib/modules/${KERNEL}/${SECTION}"; fi
+if [ ! -d $MODDIR ]; then
+    MODDIR="/lib/modules/${KERNEL}/${SECTION}"
+fi
 
-# Root or die
-if [ "$(id -u)" != "0" ]
-then
+if [ "$(id -u)" != "0" ]; then
   echo "You must be root to load or unload kernel modules"
   exit 1
 fi
 
-# Read configuration file
+# Read options out of the configuration file.
 if [ -r $CFG ]; then
     OWNER=`awk "\\$1==\"owner\" {print \\$2}" $CFG`
     GROUP=`awk "\\$1==\"group\" {print \\$2}" $CFG`
     MODE=`awk "\\$1==\"mode\" {print \\$2}" $CFG`
-    # The options string may include extra blanks or only blanks
+    # The options string may include extra blanks or only blanks.
     OPTIONS=`sed -n '/^options / s/options //p' $CFG`
 fi
 
 
-# Create device files
+# Create device files.
 function create_files () {
     cd /dev
     local devlist=""
@@ -71,13 +70,15 @@ function create_files () {
     if [ -n "$MODE"  ]; then chmod $MODE  $devlist; fi
 }
 
-# Remove device files
+# Remove device files.
 function remove_files () {
     cd /dev
     local devlist=""
     local file
     while true; do
-	if [ $# -lt 2 ]; then break; fi
+	if [ $# -lt 2 ]; then
+	    break
+	fi
 	file="${DEVICE}$1"
 	devlist="$devlist $file"
 	shift 2
@@ -85,16 +86,15 @@ function remove_files () {
     rm -f $devlist
 }
 
-# Load and create files
+# Load and create files.
 function load_device () {
-    
-    if [ -f $MODDIR/$DEVICE.o ]; then
-	devpath=$MODDIR/$DEVICE.o
-    else if [ -f ./$DEVICE.o ]; then
-	devpath=./$DEVICE.o
+    if [ -f $MODDIR/$DEVICE.ko ]; then
+	devpath=$MODDIR/$DEVICE.ko
+    elif [ -f ./$DEVICE.ko ]; then
+	devpath=./$DEVICE.ko
     else
-	devpath=$DEVICE; # let insmod/modprobe guess
-    fi; fi
+	devpath=$DEVICE # Let insmod/modprobe guess.
+    fi
     if [ "$devpath" != "$DEVICE" ]; then
 	echo -n " (loading file $devpath)"
     fi
@@ -106,10 +106,10 @@ function load_device () {
 	device_specific_post_load
     else
 	echo " FAILED!"
-     fi
+    fi
 }
 
-# Unload and remove files
+# Unload and remove files.
 function unload_device () {
     device_specific_pre_unload 
     /sbin/rmmod $DEVICE
