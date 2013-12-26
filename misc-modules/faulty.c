@@ -12,23 +12,21 @@
  * by O'Reilly & Associates.   No warranty is attached;
  * we cannot take responsibility for errors or fitness for use.
  *
- * $Id: faulty.c,v 1.3 2004/09/26 07:02:43 gregkh Exp $
  */
 
-
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/kernel.h> /* printk() */
-#include <linux/fs.h>     /* everything... */
-#include <linux/types.h>  /* size_t */
+#include <linux/kernel.h>
+#include <linux/fs.h>
+#include <linux/types.h>
+#include <linux/cdev.h>
 #include <asm/uaccess.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-
 int faulty_major = 0;
+int faulty_minor = 0;
 
 ssize_t faulty_read(struct file *filp, char __user *buf,
 		    size_t count, loff_t *pos)
@@ -36,24 +34,23 @@ ssize_t faulty_read(struct file *filp, char __user *buf,
 	int ret;
 	char stack_buf[4];
 
-	/* Let's try a buffer overflow  */
+	/* Let's try a buffer overflow. */
 	memset(stack_buf, 0xff, 20);
 	if (count > 4)
-		count = 4; /* copy 4 bytes to the user */
+		count = 4; /* Copy 4 bytes to the user. */
 	ret = copy_to_user(buf, stack_buf, count);
 	if (!ret)
 		return count;
 	return ret;
 }
 
-ssize_t faulty_write (struct file *filp, const char __user *buf, size_t count,
+ssize_t faulty_write(struct file *filp, const char __user *buf, size_t count,
 		loff_t *pos)
 {
-	/* make a simple fault by dereferencing a NULL pointer */
+	/* Make a simple fault by dereferencing a NULL pointer. */
 	*(int *)0 = 0;
 	return 0;
 }
-
 
 
 struct file_operations faulty_fops = {
@@ -63,27 +60,34 @@ struct file_operations faulty_fops = {
 };
 
 
-int faulty_init(void)
+static int __init faulty_init(void)
 {
 	int result;
+	dev_t dev;
+	struct cdev *faulty_cdev;
 
-	/*
-	 * Register your major, and accept a dynamic number
-	 */
-	result = register_chrdev(faulty_major, "faulty", &faulty_fops);
-	if (result < 0)
+	/* Register dynamically. */
+	result = alloc_chrdev_region(&dev, faulty_minor, 1, "faulty");
+
+	if (result < 0) {
+		printk(KERN_WARNING "faulty: couldn't get major number assignment\n");
 		return result;
-	if (faulty_major == 0)
-		faulty_major = result; /* dynamic */
+	}
+
+	faulty_major = MAJOR(dev);
+
+	faulty_cdev = cdev_alloc();
+	faulty_cdev->ops = &faulty_fops;
+	cdev_add(faulty_cdev, dev, 1);
 
 	return 0;
 }
 
-void faulty_cleanup(void)
+static void __exit faulty_cleanup(void)
 {
-	unregister_chrdev(faulty_major, "faulty");
+	dev_t dev = MKDEV(faulty_major, faulty_minor);
+	unregister_chrdev_region(dev, 1);
 }
 
 module_init(faulty_init);
 module_exit(faulty_cleanup);
-
