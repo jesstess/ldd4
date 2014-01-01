@@ -19,6 +19,7 @@
 
 /* Gives us access to ioctl macros _IO and friends below. */
 #include <linux/ioctl.h>
+#include <linux/mutex.h>
 
 /*
  * Macros to help with debugging. Set SCULL_DEBUG to 1 enable
@@ -94,7 +95,7 @@ struct scull_dev {
 	int qset;                 /* The current array size. */
 	unsigned long size;       /* Amount of data stored here. */
 	unsigned int access_key;  /* Used by sculluid and scullpriv. */
-	struct semaphore sem;     /* Mutual exclusion semaphore. */
+	struct mutex mutex;       /* Mutual exclusion semaphore. */
 	struct cdev cdev;	  /* Char device structure. */
 };
 
