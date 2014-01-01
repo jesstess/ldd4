@@ -12,25 +12,26 @@
  * by O'Reilly & Associates.   No warranty is attached;
  * we cannot take responsibility for errors or fitness for use.
  *
- * $Id: complete.c,v 1.2 2004/09/26 07:02:43 gregkh Exp $
  */
 
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/sched.h>  /* current and everything */
-#include <linux/kernel.h> /* printk() */
-#include <linux/fs.h>     /* everything... */
-#include <linux/types.h>  /* size_t */
+#include <linux/sched.h>
+#include <linux/kernel.h>
+#include <linux/fs.h>
+#include <linux/types.h>
+#include <linux/cdev.h>
 #include <linux/completion.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
 static int complete_major = 0;
+static int complete_minor = 0;
 
 DECLARE_COMPLETION(comp);
 
-ssize_t complete_read (struct file *filp, char __user *buf, size_t count, loff_t *pos)
+ssize_t complete_read(struct file *filp, char __user *buf, size_t count, loff_t *pos)
 {
 	printk(KERN_DEBUG "process %i (%s) going to sleep\n",
 			current->pid, current->comm);
@@ -39,13 +40,13 @@ ssize_t complete_read (struct file *filp, char __user *buf, size_t count, loff_t
 	return 0; /* EOF */
 }
 
-ssize_t complete_write (struct file *filp, const char __user *buf, size_t count,
+ssize_t complete_write(struct file *filp, const char __user *buf, size_t count,
 		loff_t *pos)
 {
 	printk(KERN_DEBUG "process %i (%s) awakening the readers...\n",
 			current->pid, current->comm);
 	complete(&comp);
-	return count; /* succeed, to avoid retrial */
+	return count;
 }
 
 
@@ -56,24 +57,33 @@ struct file_operations complete_fops = {
 };
 
 
-int complete_init(void)
+static int __init complete_init(void)
 {
 	int result;
+	dev_t dev;
+	struct cdev *complete_cdev;
 
-	/*
-	 * Register your major, and accept a dynamic number
-	 */
-	result = register_chrdev(complete_major, "complete", &complete_fops);
-	if (result < 0)
+	/* Register dynamically. */
+	result = alloc_chrdev_region(&dev, complete_minor, 1, "complete");
+
+	if (result < 0) {
+		printk(KERN_WARNING "complete: couldn't get major number assignment\n");
 		return result;
-	if (complete_major == 0)
-		complete_major = result; /* dynamic */
+	}
+
+	complete_major = MAJOR(dev);
+
+	complete_cdev = cdev_alloc();
+	complete_cdev->ops = &complete_fops;
+	cdev_add(complete_cdev, dev, 1);
+
 	return 0;
 }
 
-void complete_cleanup(void)
+static void __exit complete_cleanup(void)
 {
-	unregister_chrdev(complete_major, "complete");
+	dev_t dev = MKDEV(complete_major, complete_minor);
+	unregister_chrdev_region(dev, 1);
 }
 
 module_init(complete_init);
