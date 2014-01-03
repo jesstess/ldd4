@@ -1,15 +1,15 @@
-
 # Comment/uncomment the following line to enable/disable debugging
 #DEBUG = y
 
-
+# Add your debugging flag (or not) to ccflags.
 ifeq ($(DEBUG),y)
   DEBFLAGS = -O -g -DSCULLC_DEBUG # "-O" is needed to expand inlines
 else
   DEBFLAGS = -O2
 endif
 
-CFLAGS += $(DEBFLAGS) -I$(LDDINC)
+ccflags-y += $(DEBFLAGS)
+ccflags-y += -I$(LDDINC)
 
 TARGET = scullc
 
@@ -39,7 +39,7 @@ clean:
 
 
 depend .depend dep:
-	$(CC) $(CFLAGS) -M *.c > .depend
+	$(CC) -M *.c > .depend
 
 ifeq (.depend,$(wildcard .depend))
 include .depend
