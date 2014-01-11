@@ -246,7 +246,7 @@ static int jiq_init(void)
 
 	create_proc_read_entry("jiqwq", 0, NULL, jiq_read_wq, NULL);
 	create_proc_read_entry("jiqwqdelay", 0, NULL, jiq_read_wq_delayed, NULL);
-	create_proc_read_entry("jitimer", 0, NULL, jiq_read_run_timer, NULL);
+	create_proc_read_entry("jiqtimer", 0, NULL, jiq_read_run_timer, NULL);
 	create_proc_read_entry("jiqtasklet", 0, NULL, jiq_read_tasklet, NULL);
 
 	return 0; /* succeed */
@@ -256,7 +256,7 @@ static void jiq_cleanup(void)
 {
 	remove_proc_entry("jiqwq", NULL);
 	remove_proc_entry("jiqwqdelay", NULL);
-	remove_proc_entry("jitimer", NULL);
+	remove_proc_entry("jiqtimer", NULL);
 	remove_proc_entry("jiqtasklet", NULL);
 }
 
