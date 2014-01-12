@@ -15,7 +15,6 @@
  * $Id: _main.c.in,v 1.21 2004/10/14 20:11:39 corbet Exp $
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -271,8 +270,7 @@ ssize_t scullp_write (struct file *filp, const char __user *buf, size_t count,
  * The ioctl() implementation
  */
 
-int scullp_ioctl (struct inode *inode, struct file *filp,
-                 unsigned int cmd, unsigned long arg)
+long scullp_ioctl (struct file *filp, unsigned int cmd, unsigned long arg)
 {
 
 	int err = 0, ret = 0, tmp;
@@ -400,31 +398,42 @@ loff_t scullp_llseek (struct file *filp, loff_t off, int whence)
 struct async_work {
 	struct kiocb *iocb;
 	int result;
-	struct work_struct work;
+	struct delayed_work work;
 };
 
 /*
  * "Complete" an asynchronous operation.
  */
-static void scullp_do_deferred_op(void *p)
+static void scullp_do_deferred_op(struct work_struct *work)
 {
-	struct async_work *stuff = (struct async_work *) p;
+	struct async_work *stuff = container_of(work, struct async_work, work.work);
 	aio_complete(stuff->iocb, stuff->result, 0);
 	kfree(stuff);
 }
 
 
-static int scullp_defer_op(int write, struct kiocb *iocb, char __user *buf,
-		size_t count, loff_t pos)
+static int scullp_defer_op(int write, struct kiocb *iocb,
+		const struct iovec *iovec, unsigned long nr_segs, loff_t pos)
 {
 	struct async_work *stuff;
-	int result;
+	unsigned long seg;
+	size_t count;
+	size_t result = 0;
 
 	/* Copy now while we can access the buffer */
-	if (write)
-		result = scullp_write(iocb->ki_filp, buf, count, &pos);
-	else
-		result = scullp_read(iocb->ki_filp, buf, count, &pos);
+	for (seg = 0; seg < nr_segs; seg++) {
+		if (write)
+			count = scullp_write(iocb->ki_filp, iovec[seg].iov_base,
+					iovec[seg].iov_len, &pos);
+		else
+			count = scullp_read(iocb->ki_filp, iovec[seg].iov_base,
+					iovec[seg].iov_len, &pos);
+
+		if (count < 0) {
+			return count;
+		}
+		result += count;
+	}
 
 	/* If this is a synchronous IOCB, we return our status now. */
 	if (is_sync_kiocb(iocb))
@@ -436,22 +445,22 @@ static int scullp_defer_op(int write, struct kiocb *iocb, char __user *buf,
 		return result; /* No memory, just complete now */
 	stuff->iocb = iocb;
 	stuff->result = result;
-	INIT_WORK(&stuff->work, scullp_do_deferred_op, stuff);
+	INIT_DELAYED_WORK(&stuff->work, scullp_do_deferred_op);
 	schedule_delayed_work(&stuff->work, HZ/100);
 	return -EIOCBQUEUED;
 }
 
 
-static ssize_t scullp_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
-		loff_t pos)
+static ssize_t scullp_aio_read(struct kiocb *iocb, const struct iovec *iovec,
+		unsigned long nr_segs, loff_t pos)
 {
-	return scullp_defer_op(0, iocb, buf, count, pos);
+	return scullp_defer_op(0, iocb, iovec, nr_segs, pos);
 }
 
-static ssize_t scullp_aio_write(struct kiocb *iocb, const char __user *buf,
-		size_t count, loff_t pos)
+static ssize_t scullp_aio_write(struct kiocb *iocb, const struct iovec *iovec,
+		unsigned long nr_segs, loff_t pos)
 {
-	return scullp_defer_op(1, iocb, (char __user *) buf, count, pos);
+	return scullp_defer_op(1, iocb, iovec, nr_segs, pos);
 }
 
 
@@ -471,7 +480,7 @@ struct file_operations scullp_fops = {
 	.llseek =    scullp_llseek,
 	.read =	     scullp_read,
 	.write =     scullp_write,
-	.ioctl =     scullp_ioctl,
+	.unlocked_ioctl = scullp_ioctl,
 	.mmap =	     scullp_mmap,
 	.open =	     scullp_open,
 	.release =   scullp_release,
