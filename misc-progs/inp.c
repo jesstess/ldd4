@@ -32,7 +32,7 @@
 
 char *prgname;
 
-static int read_and_print_one(unsigned int port,int size)
+static int read_and_print_one(unsigned int port, int size)
 {
     static int iopldone = 0;
 
@@ -42,7 +42,7 @@ static int read_and_print_one(unsigned int port,int size)
 	    return 1;
 	}
 	iopldone++;
-    } else if (ioperm(port,size,1)) {
+    } else if (ioperm(port, size, 1)) {
 	fprintf(stderr, "%s: ioperm(%x): %s\n", prgname,
 		port, strerror(errno));
 	return 1;
@@ -62,29 +62,29 @@ int main(int argc, char **argv)
     unsigned int i, n, port, size, error = 0;
     
     prgname = argv[0];
-    /* find the data size */
-    switch (prgname[strlen(prgname)-1]) {
+    /* Find the data size based on the program name. */
+    switch (prgname[strlen(prgname) - 1]) {
         case 'w': size = 2; break;
         case 'l': size = 4; break;
         case 'b': case 'p': default:
 	    size = 1;
     }
 
-    setuid(0); /* if we're setuid, force it on */
+    setuid(0); /* If we're setuid, force it on. */
     for (i = 1; i < argc; i++) {
-        if ( sscanf(argv[i], "%x%n", &port, &n) < 1
+        if (sscanf(argv[i], "%x%n", &port, &n) < 1
 	      || n != strlen(argv[i]) ) {
 	    fprintf(stderr, "%s: argument \"%s\" is not a hex number\n",
 		    argv[0], argv[i]);
 	    error++; continue;
 	}
-	if (port & (size-1)) {
+	if (port & (size - 1)) {
 	    fprintf(stderr, "%s: argument \"%s\" is not properly aligned\n",
 		    argv[0], argv[i]);
 	    error++; continue;
 	}
 	error += read_and_print_one(port, size);
     }
-    exit (error ? 1 : 0);
+    exit(error ? 1 : 0);
 }
 
