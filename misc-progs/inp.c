@@ -1,8 +1,6 @@
 /* 
  * inp.c -- read all the ports specified in hex on the command line.
- *     The program uses the faster ioperm/iopl calls on x86, /dev/port
- *     on other platforms. The program acts as inb/inw/inl according
- *     to its own name
+ *     The program acts as inb/inw/inl according to its own name
  *
  * Copyright (C) 1998,2000,2001 Alessandro Rubini
  * 
@@ -29,18 +27,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#include <asm/io.h> /* linux-specific */
-
-#ifdef __GLIBC__
-#  include <sys/perm.h>
-#endif
-
-#define PORT_FILE "/dev/port"
+#include <sys/io.h>
+#include <sys/perm.h>
 
 char *prgname;
 
-#ifdef __i386__
 static int read_and_print_one(unsigned int port,int size)
 {
     static int iopldone = 0;
@@ -65,36 +56,6 @@ static int read_and_print_one(unsigned int port,int size)
 	printf("%04x: %02x\n", port, inb(port));
     return 0;
 }
-#else /* not i386 */
-
-static int read_and_print_one(unsigned int port,int size)
-{
-    static int fd = -1;
-    unsigned char b; unsigned short w; unsigned int l;
-
-    if (fd < 0)
-	fd = open(PORT_FILE, O_RDONLY);
-    if (fd < 0) {
-	fprintf(stderr, "%s: %s: %s\n", prgname, PORT_FILE, strerror(errno));
-	return 1;
-    }
-    lseek(fd, port, SEEK_SET);
-    
-    if (size == 4) {
-	read(fd, &l, 4);
-	printf("%04x: 0x%08x\n", port, l);
-    } else if (size == 2) {
-	read(fd, &w, 2);
-	printf("%04x: 0x%04x\n", port, w & 0xffff);
-    } else {
-	read(fd, &b, 1);
-	printf("%04x: 0x%02x\n", port, b & 0xff);
-    }
-    return 0;
-}
-
-#endif /* i386 */
-
 
 int main(int argc, char **argv)
 {
