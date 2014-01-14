@@ -1,8 +1,6 @@
 /* 
  * outp.c -- write all the ports specified in hex on the command line.
- *     The program uses the faster ioperm/iopl calls on x86, /dev/port
- *     on other platforms. The program acts as outb/outw/outl according
- *     to its own name
+ *     The program acts as outb/outw/outl according to its own name.
  *
  * Copyright (C) 1998,2000,2001 Alessandro Rubini
  * 
@@ -29,18 +27,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#include <asm/io.h> /* linux-specific */
-
-#ifdef __GLIBC__
-#  include <sys/perm.h>
-#endif
-
-#define PORT_FILE "/dev/port"
+#include <sys/io.h>
+#include <sys/perm.h>
 
 char *prgname;
 
-#ifdef __i386__
 static int write_one(unsigned int port, unsigned int val, int size)
 {
     static int iopldone = 0;
@@ -65,34 +56,6 @@ static int write_one(unsigned int port, unsigned int val, int size)
 	outb(val&0xff, port);
     return 0;
 }
-#else /* not i386 */
-
-static int write_one(unsigned int port, unsigned int val, int size)
-{
-    static int fd = -1;
-    unsigned char b; unsigned short w;
-
-    if (fd < 0)
-	fd = open(PORT_FILE, O_WRONLY);
-    if (fd < 0) {
-	fprintf(stderr, "%s: %s: %s\n", prgname, PORT_FILE, strerror(errno));
-	return 1;
-    }
-    lseek(fd, port, SEEK_SET);
-    
-    if (size == 4) {
-	write(fd, &val, 4);
-    } else if (size == 2) {
-	w = val;
-	write(fd, &w, 2);
-    } else {
-	b = val;
-	write(fd, &b, 1);
-    }
-    return 0;
-}
-
-#endif /* i386 */
 
 int main(int argc, char **argv)
 {
