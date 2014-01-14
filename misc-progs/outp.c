@@ -42,7 +42,7 @@ static int write_one(unsigned int port, unsigned int val, int size)
 	    return 1;
 	}
 	iopldone++;
-    } else if (ioperm(port,size,1)) {
+    } else if (ioperm(port, size, 1)) {
 	fprintf(stderr, "%s: ioperm(%x): %s\n", prgname,
 		port, strerror(errno));
 	return 1;
@@ -51,9 +51,9 @@ static int write_one(unsigned int port, unsigned int val, int size)
     if (size == 4)
 	outl(val, port);
     else if (size == 2)
-	outw(val&0xffff, port);
+	outw(val & 0xffff, port);
     else
-	outb(val&0xff, port);
+	outb(val & 0xff, port);
     return 0;
 }
 
@@ -70,14 +70,14 @@ int main(int argc, char **argv)
 	    size = 1;
     }
     setuid(0); /* if we're setuid, force it on */
-    for (i=1;i<argc-1;i++) {
+    for (i = 1; i < argc - 1; i++) {
         if ( sscanf(argv[i], "%x%n", &port, &n) < 1
 	      || n != strlen(argv[i]) ) {
 	    fprintf(stderr, "%s: argument \"%s\" is not a hex number\n",
 		    argv[0], argv[i]);
 	    error++; continue;
 	}
-	if (port & (size-1)) {
+	if (port & (size - 1)) {
 	    fprintf(stderr, "%s: argument \"%s\" is not properly aligned\n",
 		    argv[0], argv[i]);
 	    error++; continue;
@@ -95,5 +95,5 @@ int main(int argc, char **argv)
 	}
 	error += write_one(port, val, size);
     }
-    exit (error ? 1 : 0);
+    exit(error ? 1 : 0);
 }
