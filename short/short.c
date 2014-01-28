@@ -129,7 +129,7 @@ int short_release (struct inode *inode, struct file *filp)
 
 /* first, the port-oriented device */
 
-enum short_modes {SHORT_DEFAULT=0, SHORT_PAUSE, SHORT_STRING, SHORT_MEMORY};
+enum short_modes {SHORT_DEFAULT=0, SHORT_STRING, SHORT_MEMORY};
 
 ssize_t do_short_read (struct inode *inode, struct file *filp, char __user *buf,
 		size_t count, loff_t *f_pos)
@@ -163,12 +163,6 @@ ssize_t do_short_read (struct inode *inode, struct file *filp, char __user *buf,
 	    case SHORT_MEMORY:
 		while (count--) {
 			*ptr++ = ioread8(address);
-			rmb();
-		}
-		break;
-	    case SHORT_PAUSE:
-		while (count--) {
-			*(ptr++) = inb_p(port);
 			rmb();
 		}
 		break;
@@ -213,13 +207,6 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 		mode = SHORT_MEMORY;
 
 	switch(mode) {
-	case SHORT_PAUSE:
-		while (count--) {
-			outb_p(*(ptr++), port);
-			wmb();
-		}
-		break;
-
 	case SHORT_STRING:
 		outsb(port, ptr, count);
 		wmb();
