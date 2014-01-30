@@ -15,7 +15,7 @@
  *
  * $Id: shortprint.c,v 1.4 2004/09/26 08:01:04 gregkh Exp $
  */
-#include <linux/config.h>
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 
@@ -32,7 +32,7 @@
 #include <linux/poll.h>
 
 #include <asm/io.h>
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 #include <asm/atomic.h>
 
 #include "shortprint.h"
@@ -108,8 +108,8 @@ static DECLARE_WAIT_QUEUE_HEAD(shortp_out_queue);
  * Feeding the output queue to the device is handled by way of a
  * workqueue.
  */
-static void shortp_do_work(void *);
-static DECLARE_WORK(shortp_work, shortp_do_work, NULL);
+static void shortp_do_work(struct work_struct *);
+static DECLARE_WORK(shortp_work, shortp_do_work);
 static struct workqueue_struct *shortp_workqueue;
 
 /*
@@ -322,7 +322,7 @@ out:
  */
 
 
-static void shortp_do_work(void *unused)
+static void shortp_do_work(struct work_struct *work)
 {
 	int written;
 	unsigned long flags;
@@ -360,7 +360,7 @@ static void shortp_do_work(void *unused)
 /*
  * The top-half interrupt handler.
  */
-static irqreturn_t shortp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t shortp_interrupt(int irq, void *dev_id)
 {
 	if (! shortp_output_active) 
 		return IRQ_NONE;
@@ -396,7 +396,7 @@ static void shortp_timeout(unsigned long unused)
 
 	/* Otherwise we must have dropped an interrupt. */
 	spin_unlock_irqrestore(&shortp_out_lock, flags);
-	shortp_interrupt(shortp_irq, NULL, NULL);
+	shortp_interrupt(shortp_irq, NULL);
 }
     
 
