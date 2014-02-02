@@ -456,10 +456,10 @@ void short_kernelprobe(void)
 		unsigned long mask;
 
 		mask = probe_irq_on();
-		outb_p(0x10,short_base+2); /* enable reporting */
-		outb_p(0x00,short_base);   /* clear the bit */
-		outb_p(0xFF,short_base);   /* set the bit: interrupt! */
-		outb_p(0x00,short_base+2); /* disable reporting */
+		outb(0x10,short_base+2); /* enable reporting */
+		outb(0x00,short_base);   /* clear the bit */
+		outb(0xFF,short_base);   /* set the bit: interrupt! */
+		outb(0x00,short_base+2); /* disable reporting */
 		udelay(5);  /* give it some time */
 		short_irq = probe_irq_off(mask);
 
@@ -501,10 +501,10 @@ void short_selfprobe(void)
 
 	do {
 		short_irq = 0; /* none got, yet */
-		outb_p(0x10,short_base+2); /* enable */
-		outb_p(0x00,short_base);
-		outb_p(0xFF,short_base); /* toggle the bit */
-		outb_p(0x00,short_base+2); /* disable */
+		outb(0x10,short_base+2); /* enable */
+		outb(0x00,short_base);
+		outb(0xFF,short_base); /* toggle the bit */
+		outb(0x00,short_base+2); /* disable */
 		udelay(5);  /* give it some time */
 
 		/* the value has been set by the handler */
