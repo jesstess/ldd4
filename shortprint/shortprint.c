@@ -236,14 +236,14 @@ static void shortp_do_write(void)
 	mod_timer(&shortp_timer, jiffies + TIMEOUT);
 
 	/* Strobe a byte out to the device */
-	outb_p(*shortp_out_tail, shortp_base+SP_DATA);
+	outb(*shortp_out_tail, shortp_base+SP_DATA);
 	shortp_incr_out_bp(&shortp_out_tail, 1);
 	if (shortp_delay)
 		udelay(shortp_delay);
-	outb_p(cr | SP_CR_STROBE, shortp_base+SP_CONTROL);
+	outb(cr | SP_CR_STROBE, shortp_base+SP_CONTROL);
 	if (shortp_delay)
 		udelay(shortp_delay);
-	outb_p(cr & ~SP_CR_STROBE, shortp_base+SP_CONTROL);
+	outb(cr & ~SP_CR_STROBE, shortp_base+SP_CONTROL);
 }
 
 
