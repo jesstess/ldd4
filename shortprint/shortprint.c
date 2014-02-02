@@ -95,13 +95,13 @@ static inline void shortp_incr_bp(volatile unsigned long *index, int delta)
 
 /*
  * On the write side we have to be more careful, since we don't want to drop
- * data.  The semaphore is used to serialize write-side access to the buffer;
+ * data.  The mutex is used to serialize write-side access to the buffer;
  * there is only one consumer, so read-side access is unregulated.  The
  * wait queue will be awakened when space becomes available in the buffer.
  */
 static unsigned char *shortp_out_buffer = NULL;
 static volatile unsigned char *shortp_out_head, *shortp_out_tail;
-static struct semaphore shortp_out_sem;
+static struct mutex shortp_out_mutex;
 static DECLARE_WAIT_QUEUE_HEAD(shortp_out_queue);
 
 /*
@@ -113,7 +113,7 @@ static DECLARE_WORK(shortp_work, shortp_do_work);
 static struct workqueue_struct *shortp_workqueue;
 
 /*
- * Available space in the output buffer; should be called with the semaphore
+ * Available space in the output buffer; should be called with the mutex
  * held.  Returns contiguous space, so caller need not worry about wraps.
  */
 static inline int shortp_out_space(void)
@@ -274,11 +274,11 @@ static ssize_t shortp_write(struct file *filp, const char __user *buf, size_t co
 	int space, written = 0;
 	unsigned long flags;
 	/*
-	 * Take and hold the semaphore for the entire duration of the operation.  The
+	 * Take and hold the mutex for the entire duration of the operation.  The
 	 * consumer side ignores it, and it will keep other data from interleaving
 	 * with ours.
 	 */
-	if (down_interruptible(&shortp_out_sem))
+	if (mutex_lock_interruptible(&shortp_out_mutex))
 		return -ERESTARTSYS;
 	/*
 	 * Out with the data.
@@ -296,7 +296,7 @@ static ssize_t shortp_write(struct file *filp, const char __user *buf, size_t co
 		if ((space + written) > count)
 			space = count - written;
 		if (copy_from_user((char *) shortp_out_head, buf, space)) {
-			up(&shortp_out_sem);
+			mutex_unlock(&shortp_out_mutex);
 			return -EFAULT;
 		}
 		shortp_incr_out_bp(&shortp_out_head, space);
@@ -312,7 +312,7 @@ static ssize_t shortp_write(struct file *filp, const char __user *buf, size_t co
 
 out:
 	*f_pos += written;
-	up(&shortp_out_sem);
+	mutex_unlock(&shortp_out_mutex);
 	return written;
 }
 
@@ -456,7 +456,7 @@ static int shortp_init(void)
 	/* And the output buffer. */
 	shortp_out_buffer = (unsigned char *) __get_free_pages(GFP_KERNEL, 0);
 	shortp_out_head = shortp_out_tail = shortp_out_buffer;
-	sema_init(&shortp_out_sem, 1);
+	mutex_init(&shortp_out_mutex);
     
 	/* And the output info */
 	shortp_output_active = 0;
