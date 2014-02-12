@@ -83,7 +83,7 @@ int scullp_read_procmem(char *buf, char **start, off_t offset,
 	*start = buf;
 	for(i = 0; i < scullp_devs; i++) {
 		d = &scullp_devices[i];
-		if (down_interruptible (&d->sem))
+		if (mutex_lock_interruptible(&d->mutex))
 			return -ERESTARTSYS;
 		qset = d->qset;  /* retrieve the features of each device */
 		order = d->order;
@@ -104,7 +104,7 @@ int scullp_read_procmem(char *buf, char **start, off_t offset,
 				}
 		}
 	  out:
-		up (&scullp_devices[i].sem);
+		mutex_unlock(&scullp_devices[i].mutex);
 		if (len > limit)
 			break;
 	}
@@ -127,10 +127,10 @@ int scullp_open (struct inode *inode, struct file *filp)
 
     	/* now trim to 0 the length of the device if open was write-only */
 	if ( (filp->f_flags & O_ACCMODE) == O_WRONLY) {
-		if (down_interruptible (&dev->sem))
+		if (mutex_lock_interruptible(&dev->mutex))
 			return -ERESTARTSYS;
 		scullp_trim(dev); /* ignore errors */
-		up (&dev->sem);
+		mutex_unlock(&dev->mutex);
 	}
 
 	/* and use filp->private_data to point to the device data */
@@ -175,7 +175,7 @@ ssize_t scullp_read (struct file *filp, char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = 0;
 
-	if (down_interruptible (&dev->sem))
+	if (mutex_lock_interruptible(&dev->mutex))
 		return -ERESTARTSYS;
 	if (*f_pos > dev->size) 
 		goto nothing;
@@ -200,13 +200,13 @@ ssize_t scullp_read (struct file *filp, char __user *buf, size_t count,
 		retval = -EFAULT;
 		goto nothing;
 	}
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 
 	*f_pos += count;
 	return count;
 
   nothing:
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return retval;
 }
 
@@ -223,7 +223,7 @@ ssize_t scullp_write (struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM; /* our most likely error */
 
-	if (down_interruptible (&dev->sem))
+	if (mutex_lock_interruptible(&dev->mutex))
 		return -ERESTARTSYS;
 
 	/* find listitem, qset index and offset in the quantum */
@@ -258,11 +258,11 @@ ssize_t scullp_write (struct file *filp, const char __user *buf, size_t count,
     	/* update the size */
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return count;
 
   nomem:
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return retval;
 }
 
@@ -569,7 +569,7 @@ int scullp_init(void)
 	for (i = 0; i < scullp_devs; i++) {
 		scullp_devices[i].order = scullp_order;
 		scullp_devices[i].qset = scullp_qset;
-		sema_init (&scullp_devices[i].sem, 1);
+		mutex_init(&scullp_devices[i].mutex);
 		scullp_setup_cdev(scullp_devices + i, i);
 	}
 

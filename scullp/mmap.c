@@ -15,11 +15,11 @@
  * $Id: _mmap.c.in,v 1.13 2004/10/18 18:07:36 corbet Exp $
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 
 #include <linux/mm.h>		/* everything */
 #include <linux/errno.h>	/* error codes */
+#include <linux/fs.h>
 #include <asm/pgtable.h>
 
 #include "scullp.h"		/* local definitions */
@@ -57,16 +57,16 @@ void scullp_vma_close(struct vm_area_struct *vma)
  * is individually decreased, and would drop to 0.
  */
 
-struct page *scullp_vma_nopage(struct vm_area_struct *vma,
-                                unsigned long address, int *type)
+int scullp_vma_nopage(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	unsigned long offset;
 	struct scullp_dev *ptr, *dev = vma->vm_private_data;
-	struct page *page = NOPAGE_SIGBUS;
+	struct page *page = NULL;
 	void *pageptr = NULL; /* default to "missing" */
+	int ret = 0;
 
-	down(&dev->sem);
-	offset = (address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
+	mutex_lock(&dev->mutex);
+	offset = (unsigned long)(vmf->virtual_address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
 	if (offset >= dev->size) goto out; /* out of range */
 
 	/*
@@ -80,16 +80,19 @@ struct page *scullp_vma_nopage(struct vm_area_struct *vma,
 		offset -= dev->qset;
 	}
 	if (ptr && ptr->data) pageptr = ptr->data[offset];
-	if (!pageptr) goto out; /* hole or end-of-file */
+	if (!pageptr) {
+		ret = VM_FAULT_SIGBUS;
+		goto out; /* hole or end-of-file */
+	}
 	page = virt_to_page(pageptr);
 
 	/* got it, now increment the count */
 	get_page(page);
-	if (type)
-		*type = VM_FAULT_MINOR;
+	vmf->page = page;
+
   out:
-	up(&dev->sem);
-	return page;
+	mutex_unlock(&dev->mutex);
+	return ret;
 }
 
 
@@ -97,7 +100,7 @@ struct page *scullp_vma_nopage(struct vm_area_struct *vma,
 struct vm_operations_struct scullp_vm_ops = {
 	.open =     scullp_vma_open,
 	.close =    scullp_vma_close,
-	.nopage =   scullp_vma_nopage,
+	.fault =    scullp_vma_nopage,
 };
 
 
@@ -111,7 +114,6 @@ int scullp_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	/* don't do anything here: "nopage" will set up page table entries */
 	vma->vm_ops = &scullp_vm_ops;
-	vma->vm_flags |= VM_RESERVED;
 	vma->vm_private_data = filp->private_data;
 	scullp_vma_open(vma);
 	return 0;
