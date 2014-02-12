@@ -15,7 +15,6 @@
  * $Id: simple.c,v 1.12 2005/01/31 16:15:31 rubini Exp $
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -40,7 +39,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 /*
  * Open the device; in fact, there's nothing to do here.
  */
-static int simple_open (struct inode *inode, struct file *filp)
+int simple_open (struct inode *inode, struct file *filp)
 {
 	return 0;
 }
@@ -49,7 +48,7 @@ static int simple_open (struct inode *inode, struct file *filp)
 /*
  * Closing is just as simpler.
  */
-static int simple_release(struct inode *inode, struct file *filp)
+int simple_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
@@ -99,12 +98,11 @@ static int simple_remap_mmap(struct file *filp, struct vm_area_struct *vma)
 /*
  * The nopage version.
  */
-struct page *simple_vma_nopage(struct vm_area_struct *vma,
-                unsigned long address, int *type)
+static int simple_vma_nopage(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct page *pageptr;
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long physaddr = address - vma->vm_start + offset;
+	unsigned long physaddr = (unsigned long)vmf->virtual_address - vma->vm_start + offset;
 	unsigned long pageframe = physaddr >> PAGE_SHIFT;
 
 // Eventually remove these printks
@@ -112,20 +110,21 @@ struct page *simple_vma_nopage(struct vm_area_struct *vma,
 	printk (KERN_NOTICE "VA is %p\n", __va (physaddr));
 	printk (KERN_NOTICE "Page at %p\n", virt_to_page (__va (physaddr)));
 	if (!pfn_valid(pageframe))
-		return NOPAGE_SIGBUS;
+		return VM_FAULT_SIGBUS;
 	pageptr = pfn_to_page(pageframe);
 	printk (KERN_NOTICE "page->index = %ld mapping %p\n", pageptr->index, pageptr->mapping);
 	printk (KERN_NOTICE "Page frame %ld\n", pageframe);
 	get_page(pageptr);
-	if (type)
-		*type = VM_FAULT_MINOR;
-	return pageptr;
+
+	vmf->page = pageptr;
+
+	return 0;
 }
 
 static struct vm_operations_struct simple_nopage_vm_ops = {
 	.open =   simple_vma_open,
 	.close =  simple_vma_close,
-	.nopage = simple_vma_nopage,
+	.fault = simple_vma_nopage,
 };
 
 static int simple_nopage_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -134,7 +133,6 @@ static int simple_nopage_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	if (offset >= __pa(high_memory) || (filp->f_flags & O_SYNC))
 		vma->vm_flags |= VM_IO;
-	vma->vm_flags |= VM_RESERVED;
 
 	vma->vm_ops = &simple_nopage_vm_ops;
 	simple_vma_open(vma);
