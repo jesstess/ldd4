@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <errno.h>
+#include <sys/klog.h>
 
 /* A script to change the console log level. It takes as a command
    line argument an integer between 1 and 8 inclusive. Higher numbers
